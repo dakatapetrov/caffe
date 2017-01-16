@@ -4,9 +4,9 @@ root_dir=$cur_dir/../..
 cd $root_dir
 
 redo=1
-data_root_dir="$HOME/data/VOCdevkit"
-dataset_name="VOC0712"
-mapfile="$root_dir/data/$dataset_name/labelmap_voc.prototxt"
+data_root_dir="$HOME/data/adl"
+dataset_name="adl"
+mapfile="$root_dir/data/$dataset_name/labelmap_adl.prototxt"
 anno_type="detection"
 db="lmdb"
 min_dim=0
