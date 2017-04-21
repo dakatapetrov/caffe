@@ -3,6 +3,8 @@
 #include <utility>
 #include <vector>
 
+#define quote(x) #x
+
 #include "caffe/layers/multibox_loss_layer.hpp"
 #include "caffe/util/math_functions.hpp"
 
@@ -226,12 +228,76 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       CHECK_EQ(conf_pred_.count(), bottom[1]->count());
       conf_pred_.ShareData(*(bottom[1]));
     }
+    /* std::ofstream ct; */
+    /* ct.open("/home/lifelogging/code/caffe_cooc/conf_shape.csv", std::ofstream::out | std::ofstream::app); */
+    /* for (int j = 0; j < conf_shape.num_axes(); j++) { */
+    /*     ct << "axis[" << j << "]: " << conf_shape.shape(j) << "\n"; */
+    /* } */
+    /* ct.close() */
     Dtype* conf_pred_data = conf_pred_.mutable_cpu_data();
+    std::ofstream dt;
+    dt.open("/home/lifelogging/code/caffe_cooc/examine.csv", std::ofstream::out | std::ofstream::app);
+    dt << "num_conf: " << num_conf_ << std::endl;
+    for (int j = 0; j < conf_pred_.num_axes(); j++) {
+        dt << "axis[" << j << "]: " << conf_pred_.shape(j) << "\n";
+    }
+    const int x = conf_pred_.shape(0);
+    const int y = conf_pred_.shape(1);
+    /* const int h = bottom[i]->shape(2); */
+    /* const int w = bottom[i]->shape(3); */
+    std::ofstream df;
+    df.open("/home/lifelogging/code/caffe_cooc/new_conf_data.csv", std::ofstream::out | std::ofstream::app);
+    for (int p = 0; p < y; p++) {
+        for (int q = 0; q < x; q++) {
+            df << conf_pred_.data_at(q, p, 0, 0) << ",";
+        }
+        df << "\n";
+    }
+    df.close();
+    dt << "data: " <<  *conf_pred_data;
+    dt << typeid(conf_pred_data).name()<<"\t"<< quote(conf_pred_data) <<"\n";
+    dt.close();
     Dtype* conf_gt_data = conf_gt_.mutable_cpu_data();
     caffe_set(conf_gt_.count(), Dtype(background_label_id_), conf_gt_data);
     EncodeConfPrediction(conf_data, num_, num_priors_, multibox_loss_param_,
                          all_match_indices_, all_neg_indices_, all_gt_bboxes,
                          conf_pred_data, conf_gt_data);
+    std::ofstream vt;
+    vt.open("/home/lifelogging/code/caffe_cooc/top_vec.csv", std::ofstream::out | std::ofstream::app);
+    vt << "top: " << conf_top_vec_.size() << std::endl;
+    vt << "top axes: " << conf_top_vec_[0]->num_axes() << std::endl;
+    for (int j = 0; j < conf_top_vec_[0]->num_axes(); j++) {
+        vt << "axis[" << j << "]: " << conf_top_vec_[0]->shape(j) << "\n";
+    }
+    vt.close();
+    std::ofstream vb;
+    vb.open("/home/lifelogging/code/caffe_cooc/bot_vec.csv", std::ofstream::out | std::ofstream::app);
+    vb << "bot: " << conf_bottom_vec_.size() << std::endl;
+    vb << "bot axes: " << conf_bottom_vec_[0]->num_axes() << std::endl;
+    for (int j = 0; j < conf_bottom_vec_[0]->num_axes(); j++) {
+        vb << "axis[" << j << "]: " << conf_bottom_vec_[0]->shape(j) << "\n";
+    }
+    vb.close();
+    std::ofstream tt;
+    tt.open("/home/lifelogging/code/caffe_cooc/conf_bot__data.csv", std::ofstream::out | std::ofstream::app);
+    const int u = conf_bottom_vec_[0]->shape(0);
+    const int v = conf_bottom_vec_[0]->shape(1);
+    /* const int h = bottom[i]->shape(2); */
+    /* const int w = bottom[i]->shape(3); */
+    tt << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1\n";
+    for (int p = 0; p < u; p++) {
+        for (int q = 0; q < v; q++) {
+            tt << conf_bottom_vec_[0]->data_at(p, q, 0, 0) << ",";
+        }
+        tt << "\n";
+    }
+    tt << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1\n";
+    for (int p = 0; p < conf_bottom_vec_[1]->shape(0); p++) {
+        tt << conf_bottom_vec_[0]->data_at(p, 0, 0, 0) << ",";
+        tt << "\n";
+    }
+    tt << "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1\n";
+    tt.close();
     conf_loss_layer_->Reshape(conf_bottom_vec_, conf_top_vec_);
     conf_loss_layer_->Forward(conf_bottom_vec_, conf_top_vec_);
   } else {
