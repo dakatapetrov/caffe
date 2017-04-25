@@ -1312,6 +1312,8 @@ message MultiBoxLossParameter {
   optional NonMaximumSuppressionParameter nms_param = 21;
   optional int32 sample_size = 22 [default = 64];
   optional bool use_prior_for_nms = 23 [default = false];
+  optional string csv_data_path = 24;
+  optional float loss_weight = 25 [default = 1.0];
 }
 
 message MVNParameter {

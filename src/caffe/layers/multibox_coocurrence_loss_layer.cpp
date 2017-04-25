@@ -3,7 +3,7 @@
 #include <utility>
 #include <vector>
 
-#include "caffe/layers/multibox_loss_layer.hpp"
+#include "caffe/layers/multibox_coocurrence_loss_layer.hpp"
 #include "caffe/util/math_functions.hpp"
 
 #define quote(x) #x
@@ -11,11 +11,11 @@
 namespace caffe {
 
 template <typename Dtype>
-void MultiBoxLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+void MultiBoxCoocurrenceLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   LossLayer<Dtype>::LayerSetUp(bottom, top);
   if (this->layer_param_.propagate_down_size() == 0) {
-    this->layer_param_.add_propagate_down(true);
+    this->layer_param_.add_propagate_down(false);
     this->layer_param_.add_propagate_down(true);
     this->layer_param_.add_propagate_down(false);
     this->layer_param_.add_propagate_down(false);
@@ -60,6 +60,7 @@ void MultiBoxLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   vector<int> loss_shape(1, 1);
   // Set up localization loss layer.
   loc_weight_ = multibox_loss_param.loc_weight();
+  loss_weight_ = multibox_loss_param.loss_weight();
   loc_loss_type_ = multibox_loss_param.loc_loss_type();
   // fake shape.
   vector<int> loc_shape(1, 1);
@@ -101,7 +102,7 @@ void MultiBoxLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     LayerParameter layer_param;
     layer_param.set_name(this->layer_param_.name() + "_softmax_conf");
     layer_param.set_type("SoftmaxWithLoss");
-    layer_param.add_loss_weight(Dtype(1.));
+    layer_param.add_loss_weight(loss_weight_);
     layer_param.mutable_loss_param()->set_normalization(
         LossParameter_NormalizationMode_NONE);
     SoftmaxParameter* softmax_param = layer_param.mutable_softmax_param();
@@ -117,7 +118,7 @@ void MultiBoxLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     LayerParameter layer_param;
     layer_param.set_name(this->layer_param_.name() + "_logistic_conf");
     layer_param.set_type("SigmoidCrossEntropyLoss");
-    layer_param.add_loss_weight(Dtype(1.));
+    layer_param.add_loss_weight(loss_weight_);
     // Fake reshape.
     vector<int> conf_shape(1, 1);
     conf_shape.push_back(num_classes_);
@@ -128,10 +129,33 @@ void MultiBoxLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   } else {
     LOG(FATAL) << "Unknown confidence loss type.";
   }
+  // read csv
+  csv_data_path = multibox_loss_param.csv_data_path();
+  std::ifstream file(csv_data_path.c_str());
+  string line;
+  
+  // while r < 7 and getline gives correct result
+  while (getline(file, line))
+  {
+  	// debug << "read: " << line << std::endl;
+          std::vector<string> row;
+          stringstream iss(line);
+          string val;
+  
+          // while c < 7 and getline gives correct result
+          while (getline(iss, val, ','))
+          {            
+              // no need for converting as you are reading string.
+  		// debug << "pushing: " << val << std::endl;
+              row.push_back(val);
+          }
+          csv_data.push_back(row);
+  }
+
 }
 
 template <typename Dtype>
-void MultiBoxLossLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
+void MultiBoxCoocurrenceLossLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   LossLayer<Dtype>::Reshape(bottom, top);
   num_ = bottom[0]->num();
@@ -145,7 +169,7 @@ void MultiBoxLossLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 }
 
 template <typename Dtype>
-void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
   const Dtype* loc_data = bottom[0]->cpu_data();
   const Dtype* conf_data = bottom[1]->cpu_data();
@@ -228,21 +252,26 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       CHECK_EQ(conf_pred_.count(), bottom[1]->count());
       conf_pred_.ShareData(*(bottom[1]));
     }
+//    std::ofstream debug;
+//    debug.open("/home/ubuntu/caffe-cooc/cooc_examine.csv", std::ofstream::out | std::ofstream::app);
     Dtype* conf_pred_data = conf_pred_.mutable_cpu_data();
     Dtype* conf_gt_data = conf_gt_.mutable_cpu_data();
     caffe_set(conf_gt_.count(), Dtype(background_label_id_), conf_gt_data);
-    EncodeConfPrediction(conf_data, num_, num_priors_, multibox_loss_param_,
+    EncodeConfCoocPrediction(conf_data, num_, num_priors_, multibox_loss_param_,
                          all_match_indices_, all_neg_indices_, all_gt_bboxes,
+                         csv_data,
                          conf_pred_data, conf_gt_data);
-    std::ofstream debug;
-    debug.open("/home/ubuntu/caffe-cooc/examine.csv", std::ofstream::out | std::ofstream::app);
-    for (int i = 0; i < conf_gt_.count() * 10; i++) {
+    for (int i = 0; i < conf_gt_.count(); i++) {
         // debug << "match[" << i << "]: " << conf_gt_data[i] << " -> ";
         // debug << conf_pred_data[i] << std::endl;
     }
     // debug << "num_matches_: " << num_matches_ << std::endl;
     // debug << "conf_gt.count(): " << conf_gt_.count()  << std::endl;
-    debug.close();
+    std::vector<int> shape_gt_ = conf_gt_.shape();
+    for(int i = 0; i < shape_gt_.size(); i++) {
+        // debug << "conf_gt_.shape[" << i << "]: "  << shape_gt_[i]  << std::endl;
+    }
+//    debug.close();
     conf_loss_layer_->Reshape(conf_bottom_vec_, conf_top_vec_);
     conf_loss_layer_->Forward(conf_bottom_vec_, conf_top_vec_);
   } else {
@@ -264,7 +293,7 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 }
 
 template <typename Dtype>
-void MultiBoxLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
+void MultiBoxCoocurrenceLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down,
     const vector<Blob<Dtype>*>& bottom) {
 
@@ -380,7 +409,7 @@ void MultiBoxLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   all_neg_indices_.clear();
 }
 
-INSTANTIATE_CLASS(MultiBoxLossLayer);
-REGISTER_LAYER_CLASS(MultiBoxLoss);
+INSTANTIATE_CLASS(MultiBoxCoocurrenceLossLayer);
+REGISTER_LAYER_CLASS(MultiBoxCoocurrenceLoss);
 
 }  // namespace caffe
