@@ -288,7 +288,8 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>
   if (this->layer_param_.propagate_down(1)) {
     Dtype normalizer = LossLayer<Dtype>::GetNormalizer(
         normalization_, num_, num_priors_, num_matches_);
-    top[0]->mutable_cpu_data()[0] += conf_loss_.cpu_data()[0] / normalizer;
+    top[0]->mutable_cpu_data()[0] +=
+        loss_weight_ * conf_loss_.cpu_data()[0] / normalizer;
   }
 }
 
