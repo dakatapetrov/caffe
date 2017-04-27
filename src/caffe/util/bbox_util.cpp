@@ -1782,7 +1782,7 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
               // conf_gt_data[idx * num_classes + gt_label] = 1;
               conf_gt_data[idx * num_classes + gt_label] = gt_labels_conf[real_gt_label];
               /* conf_gt_data[idx_count] = gt_labels_conf[real_gt_label]; */
-              cooc_gt_data[idx * num_classes + gt_label] = gt_labels_conf[real_gt_label];
+              cooc_gt_data[match_counter] = gt_labels_conf[real_gt_label];
               break;
             default:
               LOG(FATAL) << "Unknown conf loss type.";
@@ -1793,7 +1793,7 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
                 conf_pred_data + count * num_classes);
             ++count;
           }
-          cooc_pred_data[idx * num_classes + gt_label] = conf_pred_data[idx * num_classes + gt_label];
+          cooc_pred_data[match_counter] = conf_pred_data[idx * num_classes + gt_label];
         }
       }
       // Go to next image.

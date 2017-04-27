@@ -229,8 +229,8 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>
 
   // Form data to pass on to conf_loss_layer_.
   if (do_neg_mining_) {
-    /* num_conf_ = num_matches_ + num_negs; */
-    num_conf_ = num_matches_;
+    num_conf_ = num_matches_ + num_negs;
+    // num_conf_ = num_matches_;
   } else {
     num_conf_ = num_ * num_priors_;
   }
@@ -251,7 +251,7 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>
       conf_pred_.Reshape(conf_shape);
 
       cooc_shape.push_back(1);
-      cooc_shape.push_back(num_cooc_);
+      cooc_shape.push_back(num_matches_);
       cooc_shape.push_back(num_classes_);
       cooc_gt_.Reshape(cooc_shape);
       cooc_pred_.Reshape(cooc_shape);
