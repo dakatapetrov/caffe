@@ -75,6 +75,10 @@ class MultiBoxCoocurrenceLossLayer : public LossLayer<Dtype> {
   Blob<Dtype> conf_gt_;
   // confidence loss.
   Blob<Dtype> conf_loss_;
+  //
+  Blob<Dtype> cooc_pred_;
+  //
+  Blob<Dtype> cooc_gt_;
 
   MultiBoxLossParameter multibox_loss_param_;
   int num_classes_;

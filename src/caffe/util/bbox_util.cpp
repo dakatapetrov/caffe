@@ -1658,6 +1658,7 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
       const vector<vector<int> >& all_neg_indices,
       const map<int, vector<NormalizedBBox> >& all_gt_bboxes,
       vector< vector<string> >& csv_data,
+      Dtype* cooc_pred_data, Dtype* cooc_gt_data,
       Dtype* conf_pred_data, Dtype* conf_gt_data) {
   // CHECK_EQ(num, all_match_indices.size());
   // CHECK_EQ(num, all_neg_indices.size());
@@ -1688,6 +1689,7 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
 //   std::ofstream debug;
 //   debug.open("/home/ubuntu/caffe-cooc/cooc_encode.csv", std::ofstream::out | std::ofstream::app);
   int count = 0;
+  int match_counter = 0;
   for (int i = 0; i < num; ++i) {
     std::vector<int> gt_labels;
     std::map<int, int> gt_labels_count;
@@ -1740,8 +1742,13 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
           // debug << "outer for: " << im->first << std::endl;
           gt_labels_conf[im->first] = 1;
           for (map<int, int>::iterator in = gt_labels_count.begin(); in != gt_labels_count.end(); ++in) {
+            int same_class_count = im->second;
             // debug << "inner for: " << in->first << std::endl;
-            if (im->first == in->first && im->second <= 1) continue;
+            if (im->first == in->first && same_class_count <= 1) {
+                continue;
+            } else {
+                same_class_count--;
+            }
             // debug << "getting csv data..." << std::endl;
             string conf_str_value = csv_data[im->first][in->first];
             // debug << "got csv data: " << conf_str_value << std::endl;
@@ -1753,7 +1760,6 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
             gt_labels_conf[im->first] *= conf_value;
           }
         }
-        
       }
       for (map<int, vector<int> >::const_iterator it =
           match_indices.begin(); it != match_indices.end(); ++it) {
@@ -1775,6 +1781,8 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
             case MultiBoxLossParameter_ConfLossType_LOGISTIC:
               // conf_gt_data[idx * num_classes + gt_label] = 1;
               conf_gt_data[idx * num_classes + gt_label] = gt_labels_conf[real_gt_label];
+              /* conf_gt_data[idx_count] = gt_labels_conf[real_gt_label]; */
+              cooc_gt_data[idx * num_classes + gt_label] = gt_labels_conf[real_gt_label];
               break;
             default:
               LOG(FATAL) << "Unknown conf loss type.";
@@ -1785,6 +1793,7 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
                 conf_pred_data + count * num_classes);
             ++count;
           }
+          cooc_pred_data[idx * num_classes + gt_label] = conf_pred_data[idx * num_classes + gt_label];
         }
       }
       // Go to next image.
@@ -1828,6 +1837,7 @@ template void EncodeConfCoocPrediction(const float* conf_data, const int num,
       const vector<vector<int> >& all_neg_indices,
       const map<int, vector<NormalizedBBox> >& all_gt_bboxes,
       vector< vector<string> >& csv_data,
+      float* cooc_pred_data, float* cooc_gt_data,
       float* conf_pred_data, float* conf_gt_data);
 template void EncodeConfCoocPrediction(const double* conf_data, const int num,
       const int num_priors, const MultiBoxLossParameter& multibox_loss_param,
@@ -1835,6 +1845,7 @@ template void EncodeConfCoocPrediction(const double* conf_data, const int num,
       const vector<vector<int> >& all_neg_indices,
       const map<int, vector<NormalizedBBox> >& all_gt_bboxes,
       vector< vector<string> >& csv_data,
+      double* cooc_pred_data, double* cooc_gt_data,
       double* conf_pred_data, double* conf_gt_data);
 
 

@@ -338,6 +338,9 @@ void EncodeConfPrediction(const Dtype* conf_data, const int num,
 //    all_match_indices: stores mapping between predictions and ground truth.
 //    all_neg_indices: stores the indices for negative samples.
 //    all_gt_bboxes: stores ground truth bboxes for the batch.
+//    csv_data:
+//    cooc_pred_data:
+//    cooc_gt_data:
 //    conf_pred_data: stores the confidence prediction results.
 //    conf_gt_data: stores the confidence ground truth.
 template <typename Dtype>
@@ -347,6 +350,7 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
       const vector<vector<int> >& all_neg_indices,
       const map<int, vector<NormalizedBBox> >& all_gt_bboxes,
       vector< vector<string> >& csv_data,
+      Dtype* cooc_pred_data, Dtype* cooc_gt_data,
       Dtype* conf_pred_data, Dtype* conf_gt_data);
 
 

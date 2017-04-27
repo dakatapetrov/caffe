@@ -90,8 +90,10 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>&
   }
   // Set up confidence loss layer.
   conf_loss_type_ = multibox_loss_param.conf_loss_type();
-  conf_bottom_vec_.push_back(&conf_pred_);
-  conf_bottom_vec_.push_back(&conf_gt_);
+  /* conf_bottom_vec_.push_back(&conf_pred_); */
+  /* conf_bottom_vec_.push_back(&conf_gt_); */
+  conf_bottom_vec_.push_back(&cooc_pred_);
+  conf_bottom_vec_.push_back(&cooc_gt_);
   conf_loss_.Reshape(loss_shape);
   conf_top_vec_.push_back(&conf_loss_);
   if (conf_loss_type_ == MultiBoxLossParameter_ConfLossType_SOFTMAX) {
@@ -124,6 +126,8 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>&
     conf_shape.push_back(num_classes_);
     conf_gt_.Reshape(conf_shape);
     conf_pred_.Reshape(conf_shape);
+    cooc_gt_.Reshape(conf_shape);
+    cooc_pred_.Reshape(conf_shape);
     conf_loss_layer_ = LayerRegistry<Dtype>::CreateLayer(layer_param);
     conf_loss_layer_->SetUp(conf_bottom_vec_, conf_top_vec_);
   } else {
@@ -225,13 +229,15 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>
 
   // Form data to pass on to conf_loss_layer_.
   if (do_neg_mining_) {
-    num_conf_ = num_matches_ + num_negs;
+    /* num_conf_ = num_matches_ + num_negs; */
+    num_conf_ = num_matches_;
   } else {
     num_conf_ = num_ * num_priors_;
   }
   if (num_conf_ >= 1) {
     // Reshape the confidence data.
     vector<int> conf_shape;
+    vector<int> cooc_shape;
     if (conf_loss_type_ == MultiBoxLossParameter_ConfLossType_SOFTMAX) {
       conf_shape.push_back(num_conf_);
       conf_gt_.Reshape(conf_shape);
@@ -243,6 +249,12 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>
       conf_shape.push_back(num_classes_);
       conf_gt_.Reshape(conf_shape);
       conf_pred_.Reshape(conf_shape);
+
+      cooc_shape.push_back(1);
+      cooc_shape.push_back(num_cooc_);
+      cooc_shape.push_back(num_classes_);
+      cooc_gt_.Reshape(cooc_shape);
+      cooc_pred_.Reshape(cooc_shape);
     } else {
       LOG(FATAL) << "Unknown confidence loss type.";
     }
@@ -256,10 +268,16 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>
 //    debug.open("/home/ubuntu/caffe-cooc/cooc_examine.csv", std::ofstream::out | std::ofstream::app);
     Dtype* conf_pred_data = conf_pred_.mutable_cpu_data();
     Dtype* conf_gt_data = conf_gt_.mutable_cpu_data();
+
+    Dtype* cooc_pred_data = cooc_pred_.mutable_cpu_data();
+    Dtype* cooc_gt_data = cooc_gt_.mutable_cpu_data();
+
     caffe_set(conf_gt_.count(), Dtype(background_label_id_), conf_gt_data);
+    caffe_set(cooc_gt_.count(), Dtype(background_label_id_), cooc_gt_data);
     EncodeConfCoocPrediction(conf_data, num_, num_priors_, multibox_loss_param_,
                          all_match_indices_, all_neg_indices_, all_gt_bboxes,
                          csv_data,
+                         cooc_pred_data, cooc_gt_data,
                          conf_pred_data, conf_gt_data);
     for (int i = 0; i < conf_gt_.count(); i++) {
         // debug << "match[" << i << "]: " << conf_gt_data[i] << " -> ";
