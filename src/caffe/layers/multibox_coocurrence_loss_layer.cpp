@@ -58,40 +58,9 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>&
   }
 
   vector<int> loss_shape(1, 1);
-  // Set up localization loss layer.
-  loc_weight_ = multibox_loss_param.loc_weight();
   loss_weight_ = multibox_loss_param.loss_weight();
-  loc_loss_type_ = multibox_loss_param.loc_loss_type();
-  // fake shape.
-  vector<int> loc_shape(1, 1);
-  loc_shape.push_back(4);
-  loc_pred_.Reshape(loc_shape);
-  loc_gt_.Reshape(loc_shape);
-  loc_bottom_vec_.push_back(&loc_pred_);
-  loc_bottom_vec_.push_back(&loc_gt_);
-  loc_loss_.Reshape(loss_shape);
-  loc_top_vec_.push_back(&loc_loss_);
-  if (loc_loss_type_ == MultiBoxLossParameter_LocLossType_L2) {
-    LayerParameter layer_param;
-    layer_param.set_name(this->layer_param_.name() + "_l2_loc");
-    layer_param.set_type("EuclideanLoss");
-    layer_param.add_loss_weight(loc_weight_);
-    loc_loss_layer_ = LayerRegistry<Dtype>::CreateLayer(layer_param);
-    loc_loss_layer_->SetUp(loc_bottom_vec_, loc_top_vec_);
-  } else if (loc_loss_type_ == MultiBoxLossParameter_LocLossType_SMOOTH_L1) {
-    LayerParameter layer_param;
-    layer_param.set_name(this->layer_param_.name() + "_smooth_L1_loc");
-    layer_param.set_type("SmoothL1Loss");
-    layer_param.add_loss_weight(loc_weight_);
-    loc_loss_layer_ = LayerRegistry<Dtype>::CreateLayer(layer_param);
-    loc_loss_layer_->SetUp(loc_bottom_vec_, loc_top_vec_);
-  } else {
-    LOG(FATAL) << "Unknown localization loss type.";
-  }
   // Set up confidence loss layer.
   conf_loss_type_ = multibox_loss_param.conf_loss_type();
-  /* conf_bottom_vec_.push_back(&conf_pred_); */
-  /* conf_bottom_vec_.push_back(&conf_gt_); */
   conf_bottom_vec_.push_back(&cooc_pred_);
   conf_bottom_vec_.push_back(&cooc_gt_);
   conf_loss_.Reshape(loss_shape);
@@ -133,24 +102,20 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>&
   } else {
     LOG(FATAL) << "Unknown confidence loss type.";
   }
-  // read csv
+
+  // Read co-occurrence data from CSV.
   csv_data_path = multibox_loss_param.csv_data_path();
   std::ifstream file(csv_data_path.c_str());
   string line;
   
-  // while r < 7 and getline gives correct result
   while (getline(file, line))
   {
-  	// debug << "read: " << line << std::endl;
           std::vector<string> row;
           stringstream iss(line);
           string val;
   
-          // while c < 7 and getline gives correct result
           while (getline(iss, val, ','))
           {            
-              // no need for converting as you are reading string.
-  		// debug << "pushing: " << val << std::endl;
               row.push_back(val);
           }
           csv_data.push_back(row);
@@ -209,24 +174,6 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>
                    &num_matches_, &num_negs, &all_match_indices_,
                    &all_neg_indices_);
 
-  if (num_matches_ >= 1) {
-    // Form data to pass on to loc_loss_layer_.
-    vector<int> loc_shape(2);
-    loc_shape[0] = 1;
-    loc_shape[1] = num_matches_ * 4;
-    loc_pred_.Reshape(loc_shape);
-    loc_gt_.Reshape(loc_shape);
-    Dtype* loc_pred_data = loc_pred_.mutable_cpu_data();
-    Dtype* loc_gt_data = loc_gt_.mutable_cpu_data();
-    EncodeLocPrediction(all_loc_preds, all_gt_bboxes, all_match_indices_,
-                        prior_bboxes, prior_variances, multibox_loss_param_,
-                        loc_pred_data, loc_gt_data);
-    loc_loss_layer_->Reshape(loc_bottom_vec_, loc_top_vec_);
-    loc_loss_layer_->Forward(loc_bottom_vec_, loc_top_vec_);
-  } else {
-    loc_loss_.mutable_cpu_data()[0] = 0;
-  }
-
   // Form data to pass on to conf_loss_layer_.
   if (do_neg_mining_) {
     num_conf_ = num_matches_ + num_negs;
@@ -264,8 +211,6 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>
       CHECK_EQ(conf_pred_.count(), bottom[1]->count());
       conf_pred_.ShareData(*(bottom[1]));
     }
-//    std::ofstream debug;
-//    debug.open("/home/ubuntu/caffe-cooc/cooc_examine.csv", std::ofstream::out | std::ofstream::app);
     Dtype* conf_pred_data = conf_pred_.mutable_cpu_data();
     Dtype* conf_gt_data = conf_gt_.mutable_cpu_data();
 
@@ -279,30 +224,12 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>
                          csv_data,
                          cooc_pred_data, cooc_gt_data,
                          conf_pred_data, conf_gt_data);
-    for (int i = 0; i < conf_gt_.count(); i++) {
-        // debug << "match[" << i << "]: " << conf_gt_data[i] << " -> ";
-        // debug << conf_pred_data[i] << std::endl;
-    }
-    // debug << "num_matches_: " << num_matches_ << std::endl;
-    // debug << "conf_gt.count(): " << conf_gt_.count()  << std::endl;
-    std::vector<int> shape_gt_ = conf_gt_.shape();
-    for(int i = 0; i < shape_gt_.size(); i++) {
-        // debug << "conf_gt_.shape[" << i << "]: "  << shape_gt_[i]  << std::endl;
-    }
-//    debug.close();
     conf_loss_layer_->Reshape(conf_bottom_vec_, conf_top_vec_);
     conf_loss_layer_->Forward(conf_bottom_vec_, conf_top_vec_);
   } else {
     conf_loss_.mutable_cpu_data()[0] = 0;
   }
 
-  top[0]->mutable_cpu_data()[0] = 0;
-  if (this->layer_param_.propagate_down(0)) {
-    Dtype normalizer = LossLayer<Dtype>::GetNormalizer(
-        normalization_, num_, num_priors_, num_matches_);
-    top[0]->mutable_cpu_data()[0] +=
-        loc_weight_ * loc_loss_.cpu_data()[0] / normalizer;
-  }
   if (this->layer_param_.propagate_down(1)) {
     Dtype normalizer = LossLayer<Dtype>::GetNormalizer(
         normalization_, num_, num_priors_, num_matches_);
@@ -323,47 +250,6 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*
   if (propagate_down[3]) {
     LOG(FATAL) << this->type()
         << " Layer cannot backpropagate to label inputs.";
-  }
-
-  // Back propagate on location prediction.
-  if (propagate_down[0]) {
-    Dtype* loc_bottom_diff = bottom[0]->mutable_cpu_diff();
-    caffe_set(bottom[0]->count(), Dtype(0), loc_bottom_diff);
-    if (num_matches_ >= 1) {
-      vector<bool> loc_propagate_down;
-      // Only back propagate on prediction, not ground truth.
-      loc_propagate_down.push_back(true);
-      loc_propagate_down.push_back(false);
-      loc_loss_layer_->Backward(loc_top_vec_, loc_propagate_down,
-                                loc_bottom_vec_);
-      // Scale gradient.
-      Dtype normalizer = LossLayer<Dtype>::GetNormalizer(
-          normalization_, num_, num_priors_, num_matches_);
-      Dtype loss_weight = top[0]->cpu_diff()[0] / normalizer;
-      caffe_scal(loc_pred_.count(), loss_weight, loc_pred_.mutable_cpu_diff());
-      // Copy gradient back to bottom[0].
-      const Dtype* loc_pred_diff = loc_pred_.cpu_diff();
-      int count = 0;
-      for (int i = 0; i < num_; ++i) {
-        for (map<int, vector<int> >::iterator it =
-             all_match_indices_[i].begin();
-             it != all_match_indices_[i].end(); ++it) {
-          const int label = share_location_ ? 0 : it->first;
-          const vector<int>& match_index = it->second;
-          for (int j = 0; j < match_index.size(); ++j) {
-            if (match_index[j] <= -1) {
-              continue;
-            }
-            // Copy the diff to the right place.
-            int start_idx = loc_classes_ * 4 * j + label * 4;
-            caffe_copy<Dtype>(4, loc_pred_diff + count * 4,
-                              loc_bottom_diff + start_idx);
-            ++count;
-          }
-        }
-        loc_bottom_diff += bottom[0]->offset(1);
-      }
-    }
   }
 
   // Back propagate on confidence prediction.

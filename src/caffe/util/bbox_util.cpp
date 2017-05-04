@@ -1686,77 +1686,42 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
   }
   do_neg_mining = mining_type != MultiBoxLossParameter_MiningType_NONE;
   const ConfLossType conf_loss_type = multibox_loss_param.conf_loss_type();
-//   std::ofstream debug;
-//   debug.open("/home/ubuntu/caffe-cooc/cooc_encode.csv", std::ofstream::out | std::ofstream::app);
   int count = 0;
   int match_counter = 0;
   for (int i = 0; i < num; ++i) {
     std::vector<int> gt_labels;
     std::map<int, int> gt_labels_count;
     std::map<int, double> gt_labels_conf;
-    // debug << "i: " << i << std::endl;
     if (all_gt_bboxes.find(i) != all_gt_bboxes.end()) {
       // Save matched (positive) bboxes scores and labels.
       const map<int, vector<int> >& match_indices = all_match_indices[i];
       for (map<int, vector<int> >::const_iterator it =
           match_indices.begin(); it != match_indices.end(); ++it) {
-        // debug << "it->first: " << it->first << std::endl;
-        const vector<int>& match_index = it->second;
+        const vector<int>&  match_index = it->second;
         CHECK_EQ(match_index.size(), num_priors);
         for (int j = 0; j < num_priors; ++j) {
           if (match_index[j] <= -1) {
             continue;
           }
-          // debug << "label: " << all_gt_bboxes.find(i)->second[match_index[j]].label() << std::endl;
           const int real_gt_label = all_gt_bboxes.find(i)->second[match_index[j]].label();
           gt_labels.push_back(real_gt_label);
         }
         for (vector<int>::iterator il = gt_labels.begin(); il != gt_labels.end(); ++il)
     ++gt_labels_count[*il];
 
-        // read csv
-//         std::ifstream file("/home/ubuntu/data/adl/adl-coocc-prob.csv");
-//         string line;
-//         
-//         // We can build the vector dynamically. No need to specify the length here.
-//         std::vector < std::vector<string> > csv_data;
-//         
-//         // while r < 7 and getline gives correct result
-//         while (getline(file, line))
-//         {
-// 		// debug << "read: " << line << std::endl;
-//                 std::vector<string> row;
-//                 stringstream iss(line);
-//                 string val;
-//         
-//                 // while c < 7 and getline gives correct result
-//                 while (getline(iss, val, ','))
-//                 {            
-//                     // no need for converting as you are reading string.
-// 			// debug << "pushing: " << val << std::endl;
-//                     row.push_back(val);
-//                 }
-//                 csv_data.push_back(row);
-//         }
         for (map<int, int>::iterator im = gt_labels_count.begin(); im != gt_labels_count.end(); ++im) {
-          // debug << "outer for: " << im->first << std::endl;
           gt_labels_conf[im->first] = 1;
           for (map<int, int>::iterator in = gt_labels_count.begin(); in != gt_labels_count.end(); ++in) {
             int same_class_count = im->second;
-            // debug << "inner for: " << in->first << std::endl;
             if (im->first == in->first && same_class_count <= 1) {
                 continue;
             } else {
                 same_class_count--;
             }
-            // debug << "getting csv data..." << std::endl;
             string conf_str_value = csv_data[im->first][in->first];
-            // debug << "got csv data: " << conf_str_value << std::endl;
             std::istringstream iss(conf_str_value);
-            // debug << "going for double..." << std::endl;
             double conf_value;
             iss >> conf_value;
-            // debug << "got double!" << std::endl;
             gt_labels_conf[im->first] *= conf_value;
           }
         }
@@ -1827,7 +1792,6 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
       conf_gt_data += num_priors;
     }
   }
-//    debug.close();
 }
 
 // Explicite initialization.

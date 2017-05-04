@@ -46,25 +46,10 @@ class MultiBoxCoocurrenceLossLayer : public LossLayer<Dtype> {
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-  // The internal localization loss layer.
-  shared_ptr<Layer<Dtype> > loc_loss_layer_;
-  LocLossType loc_loss_type_;
-  float loc_weight_;
-  float loss_weight_;
-  // bottom vector holder used in Forward function.
-  vector<Blob<Dtype>*> loc_bottom_vec_;
-  // top vector holder used in Forward function.
-  vector<Blob<Dtype>*> loc_top_vec_;
-  // blob which stores the matched location prediction.
-  Blob<Dtype> loc_pred_;
-  // blob which stores the corresponding matched ground truth.
-  Blob<Dtype> loc_gt_;
-  // localization loss.
-  Blob<Dtype> loc_loss_;
-
   // The internal confidence loss layer.
   shared_ptr<Layer<Dtype> > conf_loss_layer_;
   ConfLossType conf_loss_type_;
+  float loss_weight_;
   // bottom vector holder used in Forward function.
   vector<Blob<Dtype>*> conf_bottom_vec_;
   // top vector holder used in Forward function.
