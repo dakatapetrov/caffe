@@ -1759,6 +1759,7 @@ void EncodeConfCoocPrediction(const Dtype* conf_data, const int num,
             ++count;
           }
           cooc_pred_data[match_counter] = conf_pred_data[idx * num_classes + gt_label];
+          match_counter++;
         }
       }
       // Go to next image.
