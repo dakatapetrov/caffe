@@ -49,6 +49,7 @@ class MultiBoxCoocurrenceLossLayer : public LossLayer<Dtype> {
   // The internal confidence loss and softmax layers.
   shared_ptr<Layer<Dtype> > conf_loss_layer_;
   shared_ptr<Layer<Dtype> > conf_sm_layer_;
+  shared_ptr<Layer<Dtype> > conf_sm2_layer_;
   ConfLossType conf_loss_type_;
   float loss_weight_;
   // bottom vector holder used in Forward function.
@@ -59,6 +60,10 @@ class MultiBoxCoocurrenceLossLayer : public LossLayer<Dtype> {
   vector<Blob<Dtype>*> conf_sm_bottom_vec_;
   // top softmax vector holder used in Forward function.
   vector<Blob<Dtype>*> conf_sm_top_vec_;
+  // bottom  softmax vector holder used in Forward function.
+  vector<Blob<Dtype>*> conf_sm2_bottom_vec_;
+  // top softmax vector holder used in Forward function.
+  vector<Blob<Dtype>*> conf_sm2_top_vec_;
   // blob which stores the confidence prediction.
   Blob<Dtype> conf_pred_;
   // blob which stores the corresponding ground truth label.
@@ -71,6 +76,8 @@ class MultiBoxCoocurrenceLossLayer : public LossLayer<Dtype> {
   Blob<Dtype> cooc_gt_;
   // blob which stores the confidence prediction after softmax.
   Blob<Dtype> cooc_pred_sm_;
+  // blob which stores the corresponding co-occurrence probability after softmax.
+  Blob<Dtype> cooc_gt_sm_;
 
   MultiBoxLossParameter multibox_loss_param_;
   int num_classes_;

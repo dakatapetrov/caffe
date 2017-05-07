@@ -62,11 +62,13 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>&
   // Set up confidence loss layer.
   conf_loss_type_ = multibox_loss_param.conf_loss_type();
   conf_bottom_vec_.push_back(&cooc_pred_sm_);
-  conf_bottom_vec_.push_back(&cooc_gt_);
+  conf_bottom_vec_.push_back(&cooc_gt_sm_);
   conf_loss_.Reshape(loss_shape);
   conf_top_vec_.push_back(&conf_loss_);
   conf_sm_bottom_vec_.push_back(&cooc_pred_);
   conf_sm_top_vec_.push_back(&cooc_pred_sm_);
+  conf_sm2_bottom_vec_.push_back(&cooc_gt_);
+  conf_sm2_top_vec_.push_back(&cooc_gt_sm_);
   if (conf_loss_type_ == MultiBoxLossParameter_ConfLossType_SOFTMAX) {
     CHECK_GE(background_label_id_, 0)
         << "background_label_id should be within [0, num_classes) for Softmax.";
@@ -102,6 +104,7 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>&
     cooc_gt_.Reshape(conf_shape);
     cooc_pred_.Reshape(conf_shape);
     cooc_pred_sm_.Reshape(conf_shape);
+    cooc_gt_sm_.Reshape(conf_shape);
     conf_loss_layer_ = LayerRegistry<Dtype>::CreateLayer(layer_param);
     conf_loss_layer_->SetUp(conf_bottom_vec_, conf_top_vec_);
   } else {
@@ -124,9 +127,32 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>&
     cooc_gt_.Reshape(conf_shape);
     cooc_pred_.Reshape(conf_shape);
     cooc_pred_sm_.Reshape(conf_shape);
+    cooc_gt_sm_.Reshape(conf_shape);
     conf_sm_layer_ = LayerRegistry<Dtype>::CreateLayer(layer_param);
     conf_sm_layer_->SetUp(conf_sm_bottom_vec_, conf_sm_top_vec_);
   }
+  // Setup Softmax layer
+  if (conf_loss_type_ == MultiBoxLossParameter_ConfLossType_LOGISTIC) {
+    CHECK_GE(background_label_id_, 0)
+        << "background_label_id should be within [0, num_classes) for Softmax.";
+    CHECK_LT(background_label_id_, num_classes_)
+        << "background_label_id should be within [0, num_classes) for Softmax.";
+    LayerParameter layer_param;
+    layer_param.set_name(this->layer_param_.name() + "_softmax2_conf");
+    layer_param.set_type("Softmax");
+    // Fake reshape.
+    vector<int> conf_shape(1, 1);
+    conf_gt_.Reshape(conf_shape);
+    conf_shape.push_back(num_classes_);
+    conf_pred_.Reshape(conf_shape);
+    cooc_gt_.Reshape(conf_shape);
+    cooc_pred_.Reshape(conf_shape);
+    cooc_pred_sm_.Reshape(conf_shape);
+    cooc_gt_sm_.Reshape(conf_shape);
+    conf_sm2_layer_ = LayerRegistry<Dtype>::CreateLayer(layer_param);
+    conf_sm2_layer_->SetUp(conf_sm2_bottom_vec_, conf_sm2_top_vec_);
+  }
+
 
 
   // Read co-occurrence data from CSV.
@@ -229,6 +255,7 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>
       cooc_gt_.Reshape(cooc_shape);
       cooc_pred_.Reshape(cooc_shape);
       cooc_pred_sm_.Reshape(cooc_shape);
+      cooc_gt_sm_.Reshape(cooc_shape);
     } else {
       LOG(FATAL) << "Unknown confidence loss type.";
     }
@@ -254,6 +281,8 @@ void MultiBoxCoocurrenceLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>
 
     conf_sm_layer_->Reshape(conf_sm_bottom_vec_, conf_sm_top_vec_);
     conf_sm_layer_->Forward(conf_sm_bottom_vec_, conf_sm_top_vec_);
+    conf_sm2_layer_->Reshape(conf_sm2_bottom_vec_, conf_sm2_top_vec_);
+    conf_sm2_layer_->Forward(conf_sm2_bottom_vec_, conf_sm2_top_vec_);
 
     conf_loss_layer_->Reshape(conf_bottom_vec_, conf_top_vec_);
     conf_loss_layer_->Forward(conf_bottom_vec_, conf_top_vec_);
